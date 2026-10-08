@@ -1,0 +1,4 @@
+PASS unknown server exception redacted from HTTP response
+PASS HTTP 500 exception details logged but not leaked
+PASS explicit validation 400 remains intact
+3 isolated exception-filter behavior checks passed
