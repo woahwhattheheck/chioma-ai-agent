@@ -29,11 +29,30 @@ export class RedisSessionStore implements SessionStore, OnModuleDestroy {
     await this.redis.del(this.key(sessionId));
   }
 
-  onModuleDestroy(): void {
-    this.redis.disconnect();
+  async onModuleDestroy(): Promise<void> {
+    if (this.redis.status === 'end') return;
+
+    // Allow pending commands to drain and Redis to acknowledge QUIT.
+    // On an unavailable Redis server, bound shutdown and close the socket.
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        this.redis.quit(),
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(
+            () => reject(new Error('Redis shutdown deadline exceeded')),
+            1500,
+          );
+        }),
+      ]);
+    } catch {
+      this.redis.disconnect();
+    } finally {
+      if (timeout !== undefined) clearTimeout(timeout);
+    }
   }
 
   private key(sessionId: string): string {
-    return `chioma-agent:session:${sessionId}`;
+    return 'chioma-agent:session:' + sessionId;
   }
 }
