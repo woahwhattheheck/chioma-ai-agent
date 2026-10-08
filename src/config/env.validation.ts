@@ -96,6 +96,13 @@ export function validateEnvironment(
     errors.push('REDIS_URL is required when SESSION_STORE=redis');
   }
 
+  if (env.SESSION_TTL_SECONDS !== undefined) {
+    const ttl = Number(env.SESSION_TTL_SECONDS);
+    if (!Number.isSafeInteger(ttl) || ttl < 1 || ttl > 31_536_000) {
+      errors.push('SESSION_TTL_SECONDS must be an integer between 1 and 31536000');
+    }
+  }
+
   if (isNonEmpty(env.HISTORY_TOKEN_BUDGET)) {
     const parsedBudget = Number(env.HISTORY_TOKEN_BUDGET);
     if (!Number.isFinite(parsedBudget) || parsedBudget <= 0) {

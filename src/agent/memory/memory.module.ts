@@ -13,7 +13,7 @@ import { RootConfig } from '../../config/env.validation';
         const config = configService.get('app', { infer: true });
         return config.sessionStore === 'redis'
           ? new RedisSessionStore(config)
-          : new InMemorySessionStore();
+          : new InMemorySessionStore(config.sessionTtlSeconds);
       },
       inject: [ConfigService],
     },

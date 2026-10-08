@@ -1,0 +1,5 @@
+PASS idle refresh before expiry
+PASS exact idle deadline clears history
+PASS expired session starts fresh
+PASS passive sweep evicts idle session without a read
+4 focused smoke checks passed
