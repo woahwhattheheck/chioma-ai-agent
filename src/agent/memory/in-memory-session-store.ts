@@ -6,6 +6,10 @@ import { LlmMessage } from '../llm/llm.types';
 export class InMemorySessionStore implements SessionStore {
   private readonly sessions = new Map<string, LlmMessage[]>();
 
+  checkReady(): Promise<void> {
+    return Promise.resolve();
+  }
+
   getHistory(sessionId: string): Promise<LlmMessage[]> {
     return Promise.resolve(this.sessions.get(sessionId) ?? []);
   }

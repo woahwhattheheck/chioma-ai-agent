@@ -14,6 +14,30 @@ export class RedisSessionStore implements SessionStore, OnModuleDestroy {
     this.ttlSeconds = config.sessionTtlSeconds;
   }
 
+  async checkReady(): Promise<void> {
+    if (this.redis.status !== 'ready') {
+      throw new Error('Redis session backend disconnected');
+    }
+
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const response = await Promise.race([
+        this.redis.ping(),
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(
+            () => reject(new Error('Redis PING timed out')),
+            1500,
+          );
+        }),
+      ]);
+      if (response !== 'PONG') {
+        throw new Error('Redis PING not acknowledged');
+      }
+    } finally {
+      if (timeout !== undefined) clearTimeout(timeout);
+    }
+  }
+
   async getHistory(sessionId: string): Promise<LlmMessage[]> {
     const raw = await this.redis.get(this.key(sessionId));
     return raw ? (JSON.parse(raw) as LlmMessage[]) : [];
@@ -34,6 +58,6 @@ export class RedisSessionStore implements SessionStore, OnModuleDestroy {
   }
 
   private key(sessionId: string): string {
-    return `chioma-agent:session:${sessionId}`;
+    return 'chioma-agent:session:' + sessionId;
   }
 }
