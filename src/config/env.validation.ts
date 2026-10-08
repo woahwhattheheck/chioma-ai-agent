@@ -8,6 +8,7 @@ export interface RootConfig {
 export interface AppConfig {
   nodeEnv: string;
   port: number;
+  allowedOrigins: string[];
   llmProvider: LlmProvider;
   llmModel: string;
   openaiApiKey?: string;
@@ -28,6 +29,32 @@ export interface AppConfig {
    * Max LLM/tool-call loop iterations allowed for a single conversation turn.
    */
   maxToolIterations: number;
+}
+
+/**
+ * CORS origins must be exact http(s) origins, never paths, credentials, or "*".
+ * A narrow local-development default is used when ALLOWED_ORIGINS is omitted.
+ */
+export function parseAllowedOrigins(value: unknown): string[] {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error('Invalid ALLOWED_ORIGINS');
+  }
+  const origins = value.split(',').map((origin) => origin.trim());
+  for (const origin of origins) {
+    let url: URL;
+    try {
+      url = new URL(origin);
+    } catch {
+      throw new Error('Invalid ALLOWED_ORIGINS');
+    }
+    if (
+      (url.protocol !== 'http:' && url.protocol !== 'https:') ||
+      url.origin !== origin
+    ) {
+      throw new Error('Invalid ALLOWED_ORIGINS');
+    }
+  }
+  return [...new Set(origins)];
 }
 
 function isNonEmpty(value: unknown): value is string {
@@ -88,6 +115,15 @@ export function validateEnvironment(
     errors.push('CHIOMA_API_URL is required');
   }
 
+  if (env.NODE_ENV === 'production' && !isNonEmpty(env.ALLOWED_ORIGINS)) {
+    errors.push('ALLOWED_ORIGINS must be configured in production');
+  }
+  try {
+    parseAllowedOrigins(env.ALLOWED_ORIGINS ?? 'http://localhost:3000');
+  } catch {
+    errors.push('ALLOWED_ORIGINS must contain canonical http(s) origins; wildcards and paths are not allowed');
+  }
+
   const sessionStore = (env.SESSION_STORE as string) || 'memory';
   if (sessionStore !== 'memory' && sessionStore !== 'redis') {
     errors.push('SESSION_STORE must be "memory" or "redis"');
@@ -126,6 +162,9 @@ export function loadConfig(): AppConfig {
   return {
     nodeEnv: process.env.NODE_ENV ?? 'development',
     port: parseInt(process.env.PORT ?? '3100', 10),
+    allowedOrigins: parseAllowedOrigins(
+      process.env.ALLOWED_ORIGINS ?? 'http://localhost:3000',
+    ),
     llmProvider: (process.env.LLM_PROVIDER as LlmProvider) ?? 'anthropic',
     llmModel: process.env.LLM_MODEL ?? 'claude-opus-4-8',
     openaiApiKey: process.env.OPENAI_API_KEY,

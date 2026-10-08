@@ -10,9 +10,10 @@ async function bootstrap() {
   app.useWebSocketAdapter(new WsAdapter(app));
 
   const configService = app.get(ConfigService<RootConfig, true>);
-  const port = configService.get('app', { infer: true }).port;
+  const config = configService.get('app', { infer: true });
+  const port = config.port;
 
-  app.enableCors();
+  app.enableCors({ origin: config.allowedOrigins });
   await app.listen(port);
 
   console.log(`chioma-agent listening on port ${port}`);

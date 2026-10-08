@@ -1,0 +1,5 @@
+PASS comma-separated canonical allow-list with dedup
+PASS allowed vs blocked browser Origin comparison
+PASS wildcard, path, non-http and empty values rejected
+PASS explicit HTTPS port remains supported
+4 focused origin-policy checks passed
