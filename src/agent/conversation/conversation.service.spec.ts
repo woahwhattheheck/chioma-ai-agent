@@ -95,7 +95,7 @@ describe('ConversationService', () => {
     expect(execute).toHaveBeenCalledWith(
       'get_thing',
       { id: '42' },
-      { accessToken: 'tok', sessionId: 'session-1' },
+      { accessToken: 'tok' },
     );
     expect(complete).toHaveBeenCalledTimes(2);
   });
