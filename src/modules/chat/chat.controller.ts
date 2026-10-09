@@ -1,5 +1,6 @@
 import { createHash } from 'crypto';
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -12,10 +13,11 @@ import {
 } from '@nestjs/common';
 import { ConversationService } from '../../agent/conversation/conversation.service';
 import { ChatMessageDto } from './dto/chat-message.dto';
+import { ProactiveNudgesService } from './proactive-nudges.service';
 
 @Controller('chat')
 export class ChatController {
-  constructor(private readonly conversationService: ConversationService) {}
+  constructor(private readonly conversationService: ConversationService, private readonly proactiveNudges: ProactiveNudgesService) {}
 
   @Post()
   async sendMessage(
@@ -30,7 +32,22 @@ export class ChatController {
       accessToken,
     });
 
+    this.proactiveNudges.refresh(sessionId, accessToken);
     return { sessionId: clientSessionId, reply };
+  }
+
+  @Post(':sessionId/nudges')
+  updateNudges(
+    @Param('sessionId') id: string,
+    @Body() config: { enabled?: boolean },
+    @Headers('authorization') auth?: string,
+  ): { enabled: boolean } {
+    if (typeof config?.enabled !== 'boolean') {
+      throw new BadRequestException('enabled must be boolean');
+    }
+    const token = this.extractBearerToken(auth);
+    this.proactiveNudges.setEnabled(this.ownerScopedId(token, id), token, config.enabled);
+    return { enabled: config.enabled };
   }
 
   @Delete(':sessionId')
@@ -42,6 +59,7 @@ export class ChatController {
     const accessToken = this.extractBearerToken(authorization);
     const sessionId = this.ownerScopedId(accessToken, clientSessionId);
     await this.conversationService.resetSession(sessionId);
+    this.proactiveNudges.forget(sessionId);
   }
 
   /**
