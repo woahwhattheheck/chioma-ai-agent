@@ -1,0 +1,96 @@
+name: Chioma 5 exact-source acceptance
+
+on:
+  push:
+    branches:
+      - acceptance/chioma5-729179a-20261009-astra-r6
+    paths:
+      - .github/workflows/acceptance-chioma5.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chioma5-729179a-acceptance-r6
+  cancel-in-progress: false
+
+jobs:
+  chat-delete-acceptance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      CI: 'true'
+      FORCE_COLOR: '0'
+      TERM: xterm-256color
+      COLUMNS: '120'
+      LINES: '32'
+    steps:
+      - name: Check out the unchanged sponsor PR source
+        uses: actions/checkout@v4
+        with:
+          ref: 729179a35c6c448489c02645553e2a23098be1b4
+          persist-credentials: false
+      - name: Use the repository's pnpm major
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - name: Use the repository's Node version without shared cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install the frozen source lockfile
+        run: |
+          test "$(git rev-parse HEAD)" = 729179a35c6c448489c02645553e2a23098be1b4
+          pnpm install --frozen-lockfile
+      - name: Record only the existing chat authorization e2e cases
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/chioma5-evidence"
+          export EVIDENCE_DIR="$RUNNER_TEMP/chioma5-evidence"
+          set +e
+          script --quiet --return --flush \
+            --log-out "$EVIDENCE_DIR/terminal.typescript" \
+            --log-timing "$EVIDENCE_DIR/terminal.timing" \
+            --command 'printf "Source: "; git rev-parse HEAD; node --version; pnpm --version; pnpm exec jest --config ./test/jest-e2e.json --runInBand --runTestsByPath test/chat.e2e-spec.ts'
+          status=$?
+          set -e
+          export ACCEPTANCE_EXIT_CODE="$status"
+          python3 - <<'PY'
+          import base64, hashlib, io, json, os, pathlib, subprocess, tarfile
+          root = pathlib.Path(os.environ['EVIDENCE_DIR'])
+          metadata = {
+              'source_sha': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
+              'command': 'pnpm exec jest --config ./test/jest-e2e.json --runInBand --runTestsByPath test/chat.e2e-spec.ts',
+              'exit_code': int(os.environ['ACCEPTANCE_EXIT_CODE']),
+              'node': subprocess.check_output(['node', '--version'], text=True).strip(),
+              'pnpm': subprocess.check_output(['pnpm', '--version'], text=True).strip(),
+              'run_url': f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+              'recording_format': 'util-linux script output and timing; replay with scriptreplay',
+              'files': {},
+          }
+          for name in ('terminal.typescript', 'terminal.timing'):
+              data = (root / name).read_bytes()
+              metadata['files'][name] = {'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
+          (root / 'metadata.json').write_text(json.dumps(metadata, indent=2) + '\n')
+          buffer = io.BytesIO()
+          with tarfile.open(fileobj=buffer, mode='w:gz') as archive:
+              for name in ('metadata.json', 'terminal.typescript', 'terminal.timing'):
+                  archive.add(root / name, arcname=name)
+          data = buffer.getvalue()
+          if len(data) > 64 * 1024:
+              raise RuntimeError('recording exceeds bounded log-transport size; do not truncate evidence')
+          encoded = base64.b64encode(data).decode('ascii')
+          print('EVIDENCE_ARCHIVE_SHA256=' + hashlib.sha256(data).hexdigest())
+          print('EVIDENCE_ARCHIVE_BEGIN')
+          for index in range(0, len(encoded), 2048):
+              print(f'EVIDENCE_CHUNK_{index // 2048:04d}=' + encoded[index:index + 2048])
+          print('EVIDENCE_ARCHIVE_END')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write('## Exact-source chat authorization acceptance\n\n')
+              summary.write('Source: `' + metadata['source_sha'] + '`\n\n')
+              summary.write('Actual command exit: **' + str(metadata['exit_code']) + '**\n\n')
+              summary.write('The job log carries the original timestamped terminal recording in a SHA-256-bound archive. No artifact storage, repository cache, provider credentials, or external model calls were configured.\n')
+          PY
+          git diff --exit-code
+          git diff --cached --exit-code
+          exit "$status"
