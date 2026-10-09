@@ -3,6 +3,7 @@ import {
   FileDisputeTool,
   SubmitDisputeEvidenceTool,
   AcceptDisputeSettlementTool,
+  DraftDisputeFilingTool,
 } from './disputes.tool';
 import { ChiomaApiClient } from '../integrations/chioma-api/chioma-api.client';
 
@@ -236,5 +237,45 @@ describe('disputes tools', () => {
         resolvedDate: '2026-07-20',
       });
     });
+  });
+});
+
+describe('DraftDisputeFilingTool (#37)', () => {
+  const context = { accessToken: 'user-token' };
+
+  it('returns an editable human-review draft without submitting a dispute', async () => {
+    const submission = jest.spyOn(ChiomaApiClient.prototype, 'fileDispute');
+    try {
+      const tool = new DraftDisputeFilingTool();
+      const result = JSON.parse(await tool.execute({
+        propertyId: 'prop_1',
+        disputeType: 'rent_overcharge',
+        claimDescription: 'Rent was charged twice on the same date.',
+        damagesRequested: 15000,
+        evidenceUrls: ['https://example.com/receipt.pdf'],
+      }, context));
+      expect(result).toEqual(expect.objectContaining({
+        draftStatus: 'requires_human_review',
+        submissionStatus: 'not_submitted',
+        filingDraft: expect.objectContaining({
+          propertyId: 'prop_1',
+          disputeType: 'rent_overcharge',
+          damagesRequested: 15000,
+        }),
+      }));
+      expect(result.reviewChecklist).toHaveLength(3);
+      expect(submission).not.toHaveBeenCalled();
+    } finally {
+      submission.mockRestore();
+    }
+  });
+
+  it('rejects invalid filing data without submitting anything', async () => {
+    const tool = new DraftDisputeFilingTool();
+    await expect(tool.execute({
+      propertyId: 'prop_1',
+      disputeType: 'unknown',
+      claimDescription: 'An issue',
+    }, context)).rejects.toThrow('supported disputeType');
   });
 });

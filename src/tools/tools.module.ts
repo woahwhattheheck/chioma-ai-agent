@@ -21,6 +21,7 @@ import {
   FileDisputeTool,
   SubmitDisputeEvidenceTool,
   AcceptDisputeSettlementTool,
+  DraftDisputeFilingTool,
 } from './disputes.tool';
 import {
   GetFraudSignalsTool,
@@ -56,6 +57,7 @@ const TOOL_PROVIDERS = [
   FileDisputeTool,
   SubmitDisputeEvidenceTool,
   AcceptDisputeSettlementTool,
+  DraftDisputeFilingTool,
   // Fraud
   GetFraudSignalsTool,
   GetFraudAlertsTool,

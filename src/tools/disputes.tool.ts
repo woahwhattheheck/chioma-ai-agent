@@ -202,3 +202,91 @@ export class AcceptDisputeSettlementTool implements AgentTool {
     return JSON.stringify(result);
   }
 }
+
+/**
+ * Compose a local dispute draft for human review. This tool deliberately has
+ * no Chioma API dependency, side effects, or submission capability.
+ */
+@Injectable()
+export class DraftDisputeFilingTool implements AgentTool {
+  definition = {
+    name: 'draft_dispute_filing',
+    description: 'Prepare a structured dispute filing draft for human review. This does not submit, open, or alter a dispute.',
+    parameters: {
+      type: 'object',
+      properties: {
+        propertyId: { type: 'string', description: 'Property ID involved in the dispute.' },
+        disputeType: {
+          type: 'string',
+          enum: ['maintenance_not_provided', 'rent_overcharge', 'unauthorized_entry',
+            'property_damage', 'security_deposit_withholding', 'lease_violation', 'other'],
+          description: 'Category of the dispute.',
+        },
+        claimDescription: {
+          type: 'string',
+          description: 'Factual description, dates, impacts, and proposed remedy.',
+        },
+        damagesRequested: {
+          type: 'number',
+          description: 'Optional requested amount in USD cents.',
+        },
+        evidenceUrls: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional supporting URLs or evidence references.',
+        },
+      },
+      required: ['propertyId', 'disputeType', 'claimDescription'],
+    },
+  };
+
+  async execute(args: Record<string, unknown>, _context: ToolContext): Promise<string> {
+    void _context;
+    const propertyId = args.propertyId;
+    const disputeType = args.disputeType;
+    const claimDescription = args.claimDescription;
+    const validTypes = [
+      'maintenance_not_provided', 'rent_overcharge', 'unauthorized_entry',
+      'property_damage', 'security_deposit_withholding', 'lease_violation', 'other',
+    ];
+    if (typeof propertyId !== 'string' || !propertyId.trim() || propertyId.length > 200) {
+      throw new Error('A valid propertyId is required for the draft.');
+    }
+    if (typeof disputeType !== 'string' || !validTypes.includes(disputeType)) {
+      throw new Error('Choose a supported disputeType for the draft.');
+    }
+    if (typeof claimDescription !== 'string' || !claimDescription.trim() ||
+        claimDescription.length > 10000) {
+      throw new Error('A nonempty claimDescription of at most 10000 characters is required.');
+    }
+    const damagesRequested = args.damagesRequested;
+    if (damagesRequested !== undefined && (!Number.isSafeInteger(damagesRequested) ||
+        (damagesRequested as number) < 0)) {
+      throw new Error('damagesRequested must be a nonnegative integer amount in cents.');
+    }
+    const evidenceUrls = args.evidenceUrls ?? [];
+    if (!Array.isArray(evidenceUrls) || evidenceUrls.length > 30 ||
+        evidenceUrls.some((v: unknown) => typeof v !== 'string' ||
+          !v.trim() || v.length > 2048)) {
+      throw new Error('evidenceUrls must contain at most 30 nonempty string references.');
+    }
+
+    return JSON.stringify({
+      draftStatus: 'requires_human_review',
+      submissionStatus: 'not_submitted',
+      filingDraft: {
+        propertyId: propertyId.trim(),
+        disputeType,
+        claimDescription: claimDescription.trim(),
+        damagesRequested,
+        evidenceUrls,
+      },
+      reviewChecklist: [
+        'Verify the identity and property involved.',
+        'Check all statements, dates, requested damages and evidence against records.',
+        'Approve and separately submit only after explicit human confirmation.',
+      ],
+      nextAction: 'Review and edit this draft. No case was filed and no external action was taken.',
+    });
+  }
+}
