@@ -9,15 +9,18 @@ import {
   Param,
   Post,
   UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
 import { ConversationService } from '../../agent/conversation/conversation.service';
 import { ChatMessageDto } from './dto/chat-message.dto';
+import { ChatRateLimitGuard } from './chat-rate-limit.guard';
 
 @Controller('chat')
 export class ChatController {
   constructor(private readonly conversationService: ConversationService) {}
 
   @Post()
+  @UseGuards(ChatRateLimitGuard)
   async sendMessage(
     @Body() dto: ChatMessageDto,
     @Headers('authorization') authorization?: string,
