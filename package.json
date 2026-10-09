@@ -17,7 +17,7 @@
     "test:cov": "jest --coverage",
     "test:e2e": "jest --config ./test/jest-e2e.json --runInBand",
     "typecheck": "tsc --noEmit",
-    "ci": "pnpm run lint && pnpm run typecheck && pnpm run test"
+    "ci": "pnpm run lint && pnpm run typecheck && pnpm run test:cov"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.68.0",
@@ -71,6 +71,14 @@
     },
     "collectCoverageFrom": ["**/*.(t|j)s"],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "coverageThreshold": {
+      "global": {
+        "branches": 10,
+        "functions": 15,
+        "lines": 20,
+        "statements": 20
+      }
+    }
   }
 }
