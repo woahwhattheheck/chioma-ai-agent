@@ -9,6 +9,7 @@ import { createHash } from 'crypto';
 import { Server } from 'http';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { WsAdapter } from '@nestjs/platform-ws';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import {
@@ -60,6 +61,7 @@ describe('DELETE /chat/:sessionId (e2e)', () => {
       .compile();
 
     app = moduleRef.createNestApplication();
+    app.useWebSocketAdapter(new WsAdapter(app));
     await app.init();
 
     httpServer = app.getHttpServer() as Server;
