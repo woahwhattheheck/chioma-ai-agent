@@ -37,5 +37,5 @@ jobs:
       - name: Typecheck
         run: pnpm run typecheck
 
-      - name: Test
-        run: pnpm run test
+      - name: Jest coverage gate
+        run: pnpm run test:cov
