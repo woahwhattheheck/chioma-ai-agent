@@ -37,5 +37,5 @@ jobs:
       - name: Typecheck
         run: pnpm run typecheck
 
-      - name: Test
-        run: pnpm run test
+      - name: Test with coverage thresholds
+        run: pnpm run test:cov --ci --runInBand
