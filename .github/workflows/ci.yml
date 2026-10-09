@@ -10,7 +10,7 @@ on:
 
 jobs:
   ci:
-    name: Lint, Typecheck & Test
+    name: Lint, Typecheck & Coverage
     runs-on: ubuntu-latest
 
     steps:
@@ -37,5 +37,5 @@ jobs:
       - name: Typecheck
         run: pnpm run typecheck
 
-      - name: Test
-        run: pnpm run test
+      - name: Coverage gate
+        run: pnpm run test:cov
