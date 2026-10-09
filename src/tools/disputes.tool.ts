@@ -260,8 +260,8 @@ export class DraftDisputeFilingTool implements AgentTool {
       throw new Error('A nonempty claimDescription of at most 10000 characters is required.');
     }
     const damagesRequested = args.damagesRequested;
-    if (damagesRequested !== undefined && (!Number.isSafeInteger(damagesRequested) ||
-        (damagesRequested as number) < 0)) {
+    if (damagesRequested !== undefined && (typeof damagesRequested !== 'number' ||
+        !Number.isSafeInteger(damagesRequested) || damagesRequested < 0)) {
       throw new Error('damagesRequested must be a nonnegative integer amount in cents.');
     }
     const evidenceUrls = args.evidenceUrls ?? [];
