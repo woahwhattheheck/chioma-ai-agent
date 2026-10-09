@@ -28,6 +28,7 @@ export class ChatController {
 
     const reply = await this.conversationService.handleTurn(sessionId, dto.message, {
       accessToken,
+      sessionId,
     });
 
     return { sessionId: clientSessionId, reply };
