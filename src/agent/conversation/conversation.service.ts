@@ -1,4 +1,4 @@
-import { Inject, Injectable, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { v4 as uuid } from 'uuid';
 import { LLM_PROVIDER, LlmProvider } from '../llm/llm-provider.interface';
 import { LlmMessage } from '../llm/llm.types';
@@ -17,8 +17,31 @@ const DEFAULT_MAX_TOOL_ITERATIONS = 8;
 export const HISTORY_TOKEN_BUDGET = Symbol('HISTORY_TOKEN_BUDGET');
 export const MAX_TOOL_ITERATIONS = Symbol('MAX_TOOL_ITERATIONS');
 
+/**
+ * Tool inputs can include customer text, passwords, and auth parameters. Only
+ * bounded, redacted arguments belong in operational logs; never log ToolContext.
+ */
+const SENSITIVE_TOOL_ARGUMENT = /token|secret|password|credential|authorization|cookie|api[_-]?key|private[_-]?key|session[_-]?key|prompt|query|message|content|text/i;
+
+function safeToolLogArguments(args: Record<string, unknown>): unknown {
+  try {
+    const serialized = JSON.stringify(args, (key, value: unknown) => {
+      if (SENSITIVE_TOOL_ARGUMENT.test(key)) return '[REDACTED]';
+      if (typeof value === 'string' && value.length > 256) {
+        return `[LONG_STRING:${value.length}_CHARS]`;
+      }
+      return value;
+    });
+    if (!serialized || serialized.length > 2048) return '[ARGS_TOO_LARGE]';
+    return JSON.parse(serialized) as Record<string, unknown>;
+  } catch {
+    return '[UNSERIALIZABLE_ARGS]';
+  }
+}
+
 @Injectable()
 export class ConversationService {
+  private readonly logger = new Logger(ConversationService.name);
   constructor(
     @Inject(LLM_PROVIDER) private readonly llmProvider: LlmProvider,
     @Inject(SESSION_STORE) private readonly sessionStore: SessionStore,
@@ -71,11 +94,38 @@ export class ConversationService {
       }
 
       for (const toolCall of result.message.toolCalls) {
-        const output = await this.toolRegistry.execute(
-          toolCall.name,
-          toolCall.arguments,
-          toolContext,
+        const startedAt = Date.now();
+        const logArguments = safeToolLogArguments(toolCall.arguments);
+        let output: string;
+        try {
+          output = await this.toolRegistry.execute(
+            toolCall.name,
+            toolCall.arguments,
+            toolContext,
+          );
+        } catch (error) {
+          this.logger.error(JSON.stringify({
+            event: 'tool_invocation',
+            tool: toolCall.name,
+            args: logArguments,
+            durationMs: Date.now() - startedAt,
+            success: false,
+            error: 'tool_registry_threw',
+          }));
+          throw error;
+        }
+        // ToolRegistry converts known tool errors to strings, not exceptions.
+        const success = !(
+          output.startsWith(`Error: unknown tool "${toolCall.name}"`) ||
+          output.startsWith(`Error executing tool "${toolCall.name}":`)
         );
+        this.logger.log(JSON.stringify({
+          event: 'tool_invocation',
+          tool: toolCall.name,
+          args: logArguments,
+          durationMs: Date.now() - startedAt,
+          success,
+        }));
         const toolMessage: LlmMessage = {
           role: 'tool',
           content: output,
