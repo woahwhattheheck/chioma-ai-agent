@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
 import { AxiosRequestConfig } from 'axios';
 import { RootConfig } from '../../config/env.validation';
+import { ChiomaApiCircuitBreaker } from './chioma-api-circuit-breaker';
 
 export interface PropertyRecommendation {
   propertyId: string;
@@ -158,6 +159,7 @@ export interface PreferencesResult {
 @Injectable()
 export class ChiomaApiClient {
   private readonly baseUrl: string;
+  private readonly circuitBreaker = new ChiomaApiCircuitBreaker();
 
   constructor(
     private readonly httpService: HttpService,
@@ -381,10 +383,12 @@ export class ChiomaApiClient {
       baseURL: this.baseUrl,
       headers: { Authorization: `Bearer ${accessToken}` },
     };
-    const response = await firstValueFrom(
-      this.httpService.post<T>(path, data ?? {}, config),
-    );
-    return response.data;
+    return this.circuitBreaker.execute(async () => {
+      const response = await firstValueFrom(
+        this.httpService.post<T>(path, data ?? {}, config),
+      );
+      return response.data;
+    });
   }
   private async get<T>(
     path: string,
@@ -396,7 +400,9 @@ export class ChiomaApiClient {
       headers: { Authorization: `Bearer ${accessToken}` },
       params,
     };
-    const response = await firstValueFrom(this.httpService.get<T>(path, config));
-    return response.data;
+    return this.circuitBreaker.execute(async () => {
+      const response = await firstValueFrom(this.httpService.get<T>(path, config));
+      return response.data;
+    });
   }
 }
