@@ -57,6 +57,69 @@ export class GetMatchScoreTool implements AgentTool {
   }
 }
 
+/**
+ * Compare shortlisted properties using only the authenticated matching API.
+ * The comparison intentionally contains no unverified rent, address or inventory data.
+ */
+@Injectable()
+export class CompareShortlistedPropertiesTool implements AgentTool {
+  definition = {
+    name: 'compare_shortlisted_properties',
+    description:
+      'Compare 2 to 8 shortlisted property listings side by side using the current user\'s matching scores and reasons.',
+    parameters: {
+      type: 'object',
+      properties: {
+        propertyIds: {
+          type: 'array',
+          items: { type: 'string' },
+          minItems: 2,
+          maxItems: 8,
+          uniqueItems: true,
+          description: 'Two to eight distinct property listing IDs to compare, in display order.',
+        },
+      },
+      required: ['propertyIds'],
+    },
+  };
+
+  constructor(private readonly chiomaApi: ChiomaApiClient) {}
+
+  async execute(args: Record<string, unknown>, context: ToolContext): Promise<string> {
+    const ids = args.propertyIds;
+    if (
+      !Array.isArray(ids) ||
+      ids.length < 2 ||
+      ids.length > 8 ||
+      ids.some((id) => typeof id !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(id)) ||
+      new Set(ids).size !== ids.length
+    ) {
+      throw new Error('propertyIds must contain 2 to 8 distinct, valid listing IDs');
+    }
+
+    const comparisons = await Promise.all(
+      ids.map(async (propertyId: string) => {
+        const result = await this.chiomaApi.getMatchScore(context.accessToken, propertyId);
+        if (
+          result.propertyId !== propertyId ||
+          !Number.isFinite(result.score) ||
+          !Array.isArray(result.reasons) ||
+          !result.reasons.every((reason) => typeof reason === 'string')
+        ) {
+          throw new Error('Backend returned an invalid property match-score response');
+        }
+        return {
+          propertyId,
+          matchScore: result.score,
+          reasons: result.reasons,
+        };
+      }),
+    );
+
+    return JSON.stringify({ propertyIds: ids, comparisons });
+  }
+}
+
 @Injectable()
 export class GetSimilarPropertiesTool implements AgentTool {
   definition = {
