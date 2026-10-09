@@ -1,5 +1,6 @@
 import {
   GetPaymentStatusTool,
+  GetRentPaymentStatusTool,
   MakePaymentTool,
   GetChargeBreakdownTool,
 } from './payments.tool';
@@ -13,6 +14,10 @@ describe('payments tools', () => {
       ReturnType<ChiomaApiClient['getPaymentStatus']>,
       Parameters<ChiomaApiClient['getPaymentStatus']>
     >();
+    const getRentPaymentStatus = jest.fn<
+      ReturnType<ChiomaApiClient['getRentPaymentStatus']>,
+      Parameters<ChiomaApiClient['getRentPaymentStatus']>
+    >();
     const makePayment = jest.fn<
       ReturnType<ChiomaApiClient['makePayment']>,
       Parameters<ChiomaApiClient['makePayment']>
@@ -23,10 +28,11 @@ describe('payments tools', () => {
     >();
     const client = {
       getPaymentStatus,
+      getRentPaymentStatus,
       makePayment,
       getChargeBreakdown,
     } as unknown as ChiomaApiClient;
-    return { client, getPaymentStatus, makePayment, getChargeBreakdown };
+    return { client, getPaymentStatus, getRentPaymentStatus, makePayment, getChargeBreakdown };
   }
 
   describe('GetPaymentStatusTool', () => {
@@ -64,6 +70,37 @@ describe('payments tools', () => {
       await tool.execute({ propertyId: 'prop123', limit: 50 }, context);
 
       expect(getPaymentStatus).toHaveBeenCalledWith('tok', 'prop123', 50);
+    });
+  });
+
+  describe('GetRentPaymentStatusTool', () => {
+    it('exposes the exact read-only rent-status name and caller bearer context', async () => {
+      const { client, getRentPaymentStatus, makePayment } = makeClient();
+      const status = {
+        currentBalance: 150000,
+        nextDueDate: '2026-11-01',
+        history: [{ date: '2026-10-01', amount: 150000, status: 'paid' }],
+      };
+      getRentPaymentStatus.mockResolvedValue(status);
+      const tool = new GetRentPaymentStatusTool(client);
+
+      expect(tool.definition.name).toBe('get_rent_payment_status');
+      const result = await tool.execute({}, context);
+
+      expect(getRentPaymentStatus).toHaveBeenCalledWith('tok', undefined, 20);
+      expect(makePayment).not.toHaveBeenCalled();
+      expect(JSON.parse(result)).toEqual(status);
+    });
+
+    it('forwards the property ID and requested history limit without mutation', async () => {
+      const { client, getRentPaymentStatus, makePayment } = makeClient();
+      getRentPaymentStatus.mockResolvedValue({ currentBalance: 0, history: [] });
+      const tool = new GetRentPaymentStatusTool(client);
+
+      await tool.execute({ propertyId: 'rental-42', limit: 7 }, context);
+
+      expect(getRentPaymentStatus).toHaveBeenCalledWith('tok', 'rental-42', 7);
+      expect(makePayment).not.toHaveBeenCalled();
     });
   });
 
