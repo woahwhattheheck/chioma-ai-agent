@@ -380,12 +380,33 @@ export class ChiomaApiClient {
     const config: AxiosRequestConfig = {
       baseURL: this.baseUrl,
       headers: { Authorization: `Bearer ${accessToken}` },
+      timeout: 8000,
     };
     const response = await firstValueFrom(
       this.httpService.post<T>(path, data ?? {}, config),
     );
     return response.data;
   }
+  /** Only network/timeout/408/429/5xx GET failures are safe to retry. */
+  private isRetryableReadError(error: unknown): boolean {
+    if (typeof error !== 'object' || error === null) return false;
+    const candidate = error as {
+      code?: unknown;
+      response?: { status?: unknown };
+    };
+    const retryableCodes = [
+      'ECONNABORTED',
+      'ETIMEDOUT',
+      'ECONNRESET',
+      'EAI_AGAIN',
+    ];
+    if (typeof candidate.code === 'string' &&
+        retryableCodes.includes(candidate.code)) return true;
+    const status = candidate.response?.status;
+    return typeof status === 'number' &&
+      (status === 408 || status === 429 || status >= 500);
+  }
+
   private async get<T>(
     path: string,
     accessToken: string,
@@ -395,8 +416,21 @@ export class ChiomaApiClient {
       baseURL: this.baseUrl,
       headers: { Authorization: `Bearer ${accessToken}` },
       params,
+      timeout: 8000,
     };
-    const response = await firstValueFrom(this.httpService.get<T>(path, config));
-    return response.data;
+    // A bounded total of three attempts and 100/200ms exponential backoff.
+    // Mutating POST calls deliberately stay outside this retry path.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const response = await firstValueFrom(this.httpService.get<T>(path, config));
+        return response.data;
+      } catch (error) {
+        if (attempt === 2 || !this.isRetryableReadError(error)) throw error;
+        await new Promise<void>((resolve) =>
+          setTimeout(resolve, 100 * 2 ** attempt),
+        );
+      }
+    }
+    throw new Error('Chioma GET retry limit reached');
   }
 }
