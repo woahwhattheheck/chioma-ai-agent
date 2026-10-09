@@ -21,6 +21,7 @@ jobs:
     env:
       CI: 'true'
       FORCE_COLOR: '0'
+      SCARF_ANALYTICS: 'false'
       TERM: xterm-256color
       COLUMNS: '120'
       LINES: '32'
@@ -28,7 +29,7 @@ jobs:
       - name: Check out the unchanged sponsor PR source
         uses: actions/checkout@v4
         with:
-          ref: 729179a35c6c448489c02645553e2a23098be1b4
+          ref: 84633e76bf59e0f6652c38a23ad7f5239bd961af
           persist-credentials: false
       - name: Use the repository's pnpm major
         uses: pnpm/action-setup@v4
@@ -40,7 +41,7 @@ jobs:
           node-version: 22
       - name: Install the frozen source lockfile
         run: |
-          test "$(git rev-parse HEAD)" = 729179a35c6c448489c02645553e2a23098be1b4
+          test "$(git rev-parse HEAD)" = 84633e76bf59e0f6652c38a23ad7f5239bd961af
           pnpm install --frozen-lockfile
       - name: Record only the existing chat authorization e2e cases
         shell: bash
