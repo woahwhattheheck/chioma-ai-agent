@@ -74,7 +74,7 @@ export class ConversationService {
         const output = await this.toolRegistry.execute(
           toolCall.name,
           toolCall.arguments,
-          toolContext,
+          { ...toolContext, sessionId },
         );
         const toolMessage: LlmMessage = {
           role: 'tool',
