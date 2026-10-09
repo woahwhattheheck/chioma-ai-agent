@@ -224,6 +224,15 @@ export class ChiomaApiClient {
     return this.get('/api/payments/status', accessToken, { propertyId, limit });
   }
 
+  /** Read-only rent-payment lookup exposed under the explicit tool API name. */
+  getRentPaymentStatus(
+    accessToken: string,
+    propertyId?: string,
+    limit?: number,
+  ): Promise<PaymentStatus> {
+    return this.getPaymentStatus(accessToken, propertyId, limit);
+  }
+
   makePayment(
     accessToken: string,
     payment: {
