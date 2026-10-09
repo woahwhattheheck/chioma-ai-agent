@@ -87,3 +87,82 @@ export class GetSimilarPropertiesTool implements AgentTool {
     return JSON.stringify(similar);
   }
 }
+
+
+/**
+ * Compare a bounded shortlist without making mutations or inferring facts
+ * that are absent from the published listing and matching responses.
+ */
+@Injectable()
+export class CompareShortlistedPropertiesTool implements AgentTool {
+  definition = {
+    name: 'compare_shortlisted_properties',
+    description:
+      'Compare 2–8 shortlisted published properties side by side: price, location, rooms, amenities and personal match reasons. Use property IDs from Chioma, not guessed listings.',
+    parameters: {
+      type: 'object',
+      properties: {
+        propertyIds: {
+          type: 'array',
+          items: { type: 'string' },
+          minItems: 2,
+          maxItems: 8,
+          uniqueItems: true,
+          description: 'Two to eight distinct published property IDs to compare.',
+        },
+      },
+      required: ['propertyIds'],
+    },
+  };
+
+  constructor(private readonly chiomaApi: ChiomaApiClient) {}
+
+  async execute(args: Record<string, unknown>, context: ToolContext): Promise<string> {
+    const rawIds = args.propertyIds;
+    if (!Array.isArray(rawIds) || rawIds.length < 2 || rawIds.length > 8 ||
+      rawIds.some((id) => typeof id !== 'string' || !id.trim())) {
+      throw new Error('Provide 2–8 non-empty property IDs for comparison');
+    }
+    const propertyIds: string[] = (rawIds as string[]).map((id) => id.trim());
+    if (new Set(propertyIds.map((id) => id.toLowerCase())).size !== propertyIds.length) {
+      throw new Error('Shortlisted property IDs must be distinct');
+    }
+
+    // One property at a time caps outstanding backend reads at two, avoiding
+    // an unbounded request burst while still grouping each listing and score.
+    const properties = [];
+    for (const propertyId of propertyIds) {
+      const [listing, match] = await Promise.all([
+        this.chiomaApi.getProperty(context.accessToken, propertyId),
+        this.chiomaApi.getMatchScore(context.accessToken, propertyId),
+      ]);
+      if (listing.id.toLowerCase() !== propertyId.toLowerCase() ||
+        match.propertyId.toLowerCase() !== propertyId.toLowerCase()) {
+        throw new Error('Backend property comparison response does not match requested ID');
+      }
+      properties.push({
+        propertyId,
+        title: listing.title,
+        propertyType: listing.type,
+        price: listing.price,
+        currency: listing.currency,
+        location: {
+          address: listing.address ?? null,
+          city: listing.city ?? null,
+          state: listing.state ?? null,
+          country: listing.country ?? null,
+        },
+        bedrooms: listing.bedrooms ?? null,
+        bathrooms: listing.bathrooms ?? null,
+        area: listing.area ?? null,
+        isFurnished: listing.isFurnished ?? null,
+        hasParking: listing.hasParking ?? null,
+        petsAllowed: listing.petsAllowed ?? null,
+        verificationStatus: listing.verificationStatus ?? null,
+        matchScore: match.score,
+        matchReasons: match.reasons,
+      });
+    }
+    return JSON.stringify({ comparedCount: properties.length, properties });
+  }
+}
