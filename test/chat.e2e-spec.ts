@@ -5,6 +5,7 @@ process.env.LLM_PROVIDER ??= 'anthropic';
 process.env.ANTHROPIC_API_KEY ??= 'test-anthropic-key';
 process.env.SESSION_STORE ??= 'memory';
 
+import { createHash } from 'crypto';
 import { Server } from 'http';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -38,7 +39,17 @@ describe('DELETE /chat/:sessionId (e2e)', () => {
   let app: INestApplication;
   let httpServer: Server;
   let sessionStore: SessionStore;
-  const authHeader = 'Bearer test-token';
+
+  const ownerBearer = 'Bearer test-token';
+  const otherBearer = 'Bearer another-user-token';
+
+  // The controller deliberately keeps raw client session IDs opaque to the
+  // store, namespacing them under a fingerprint of the authenticated bearer.
+  function scopedId(authorization: string, sessionId: string): string {
+    const accessToken = authorization.slice('Bearer '.length);
+    const prefix = createHash('sha256').update(accessToken).digest('hex').slice(0, 16);
+    return `${prefix}:${sessionId}`;
+  }
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -59,43 +70,84 @@ describe('DELETE /chat/:sessionId (e2e)', () => {
     await app.close();
   });
 
-  it("clears a session's history after DELETE", async () => {
-    // (a) First turn creates a session.
+  it('clears only the authenticated owner-scoped session', async () => {
     const created = await request(httpServer)
       .post('/chat')
-      .set('Authorization', authHeader)
+      .set('Authorization', ownerBearer)
       .send({ message: 'Hello there' })
       .expect(201);
-
     const { sessionId } = created.body as ChatResponse;
-    expect(sessionId).toBeTruthy();
 
-    // (b) Second turn with the same sessionId builds up history.
     await request(httpServer)
       .post('/chat')
-      .set('Authorization', authHeader)
+      .set('Authorization', ownerBearer)
       .send({ message: 'A follow-up question', sessionId })
       .expect(201);
 
-    // Sanity check: the store actually holds history for this session now.
-    const historyBefore = await sessionStore.getHistory(sessionId);
-    expect(historyBefore.length).toBeGreaterThan(0);
+    const key = scopedId(ownerBearer, sessionId);
+    expect((await sessionStore.getHistory(key)).length).toBeGreaterThan(0);
 
-    // (c) Reset the session.
-    await request(httpServer).delete(`/chat/${sessionId}`).expect(204);
+    await request(httpServer)
+      .delete(`/chat/${sessionId}`)
+      .set('Authorization', ownerBearer)
+      .expect(204);
 
-    // (d) History is actually gone — assert directly against the store, which is
-    // more precise than inferring memory loss from LLM output.
-    const historyAfter = await sessionStore.getHistory(sessionId);
-    expect(historyAfter).toEqual([]);
+    expect(await sessionStore.getHistory(key)).toEqual([]);
   });
 
-  // TODO(#5): DELETE /chat/:sessionId currently has NO auth check (open issue #5).
-  // The endpoint accepts any request and returns 204. Once #5 adds the same
-  // Bearer-token requirement that POST /chat already enforces, unskip this block.
-  describe.skip('auth check (pending #5)', () => {
-    it('rejects a delete with no bearer token (401)', async () => {
-      await request(httpServer).delete('/chat/some-session-id').expect(401);
-    });
+  it('returns 401 for missing, empty, malformed or non-Bearer authorization', async () => {
+    const created = await request(httpServer)
+      .post('/chat')
+      .set('Authorization', ownerBearer)
+      .send({ message: 'Retain this history' })
+      .expect(201);
+    const { sessionId } = created.body as ChatResponse;
+    const key = scopedId(ownerBearer, sessionId);
+    const path = `/chat/${sessionId}`;
+
+    await request(httpServer).delete(path).expect(401);
+    for (const badHeader of [
+      'Basic test-token',
+      'Bearer',
+      'Bearer ',
+      'Bearer two words',
+    ]) {
+      await request(httpServer)
+        .delete(path)
+        .set('Authorization', badHeader)
+        .expect(401);
+    }
+
+    expect((await sessionStore.getHistory(key)).length).toBeGreaterThan(0);
+  });
+
+  it('cannot delete a different token owner’s history even with the same sessionId', async () => {
+    const created = await request(httpServer)
+      .post('/chat')
+      .set('Authorization', ownerBearer)
+      .send({ message: 'Owner-only conversation' })
+      .expect(201);
+    const { sessionId } = created.body as ChatResponse;
+    const ownerKey = scopedId(ownerBearer, sessionId);
+    const otherKey = scopedId(otherBearer, sessionId);
+
+    expect(ownerKey).not.toBe(otherKey);
+    expect((await sessionStore.getHistory(ownerKey)).length).toBeGreaterThan(0);
+
+    // A different valid bearer has a different storage namespace. A 204 does
+    // not imply the caller was authorized to clear the owner's conversation.
+    await request(httpServer)
+      .delete(`/chat/${sessionId}`)
+      .set('Authorization', otherBearer)
+      .expect(204);
+
+    expect((await sessionStore.getHistory(ownerKey)).length).toBeGreaterThan(0);
+    expect(await sessionStore.getHistory(otherKey)).toEqual([]);
+
+    await request(httpServer)
+      .delete(`/chat/${sessionId}`)
+      .set('Authorization', ownerBearer)
+      .expect(204);
+    expect(await sessionStore.getHistory(ownerKey)).toEqual([]);
   });
 });

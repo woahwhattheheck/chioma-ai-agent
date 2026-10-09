@@ -56,11 +56,14 @@ export class ChatController {
   }
 
   private extractBearerToken(authorization?: string): string {
-    if (!authorization?.startsWith('Bearer ')) {
+    // Do not accept an empty token, embedded whitespace, or a non-Bearer
+    // scheme. POST and DELETE must enforce the same principal boundary.
+    const accessToken = /^Bearer ([^\s]+)$/.exec(authorization ?? '')?.[1];
+    if (!accessToken) {
       throw new UnauthorizedException(
-        'Missing bearer token — pass the chioma backend access token in the Authorization header.',
+        'Missing or invalid bearer token — pass the chioma backend access token in the Authorization header.',
       );
     }
-    return authorization.slice('Bearer '.length);
+    return accessToken;
   }
 }
