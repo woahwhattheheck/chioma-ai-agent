@@ -15,6 +15,9 @@ export class ChiomaApiCircuitBreaker {
   private failures = 0;
   private openedAt: number | null = null;
   private probeInFlight = false;
+  // Outcomes admitted before a recovery transition belong to an older
+  // generation and must not mutate the recovered circuit.
+  private generation = 0;
 
   constructor(
     private readonly failureThreshold = 3,
@@ -23,6 +26,7 @@ export class ChiomaApiCircuitBreaker {
   ) {}
 
   async execute<T>(request: () => Promise<T>): Promise<T> {
+    const observedGeneration = this.generation;
     const observedOpen = this.openedAt;
     const isRecoveryProbe = observedOpen !== null;
 
@@ -36,18 +40,20 @@ export class ChiomaApiCircuitBreaker {
 
     try {
       const result = await request();
-      if (isRecoveryProbe && this.openedAt === observedOpen) {
+      if (isRecoveryProbe && this.generation === observedGeneration) {
         this.reset();
-      } else if (!isRecoveryProbe && this.openedAt === null) {
+      } else if (!isRecoveryProbe && this.generation === observedGeneration) {
         this.failures = 0;
       }
       return result;
     } catch (error) {
+      // An older request can reject its own caller but cannot affect newer state.
+      if (this.generation !== observedGeneration) throw error;
       if (this.isBackendFailure(error)) {
         if (isRecoveryProbe) {
-          this.openedAt = this.clock();
+          this.open();
         } else if (this.openedAt === null && ++this.failures >= this.failureThreshold) {
-          this.openedAt = this.clock();
+          this.open();
         }
       } else if (isRecoveryProbe && this.openedAt === observedOpen) {
         // A response such as 401/404 proves the backend is reachable.
@@ -76,7 +82,13 @@ export class ChiomaApiCircuitBreaker {
     ].includes(axiosError.code ?? '');
   }
 
+  private open(): void {
+    this.generation++;
+    this.openedAt = this.clock();
+  }
+
   private reset(): void {
+    this.generation++;
     this.failures = 0;
     this.openedAt = null;
   }
