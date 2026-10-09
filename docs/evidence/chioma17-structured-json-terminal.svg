@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="360" viewBox="0 0 1920 360" role="img" aria-label="Captured focused logging check terminal output">
+<rect width="1920" height="360" fill="#0d1117"/>
+<rect x="12" y="12" width="1896" height="336" rx="14" fill="#161b22" stroke="#30363d" stroke-width="2"/>
+<circle cx="40" cy="39" r="7" fill="#f85149"/><circle cx="65" cy="39" r="7" fill="#d29922"/><circle cx="90" cy="39" r="7" fill="#3fb950"/>
+<g font-family="monospace" font-size="16" xml:space="preserve">
+<text x="34" y="80" fill="#79c0ff">$ node chioma17-proof/check.cjs</text>
+<text x="34" y="112" fill="#3fb950">focused JSON logger check: PASS (syntax, event shape, severity, token redaction)</text>
+<text x="34" y="144" fill="#c9d1d9">genuine logger output (synthetic fields, no network/HTTP integration):</text>
+<text x="34" y="178" fill="#e6edf3">{"timestamp":"2026-10-09T03:30:39.696Z","level":"info","event":"tool.execution","environment":"production","tool":"get_match_score","outcome":"ok","duration_ms":12}</text>
+<text x="34" y="212" fill="#e6edf3">{"timestamp":"2026-10-09T03:30:39.697Z","level":"error","event":"http.request","environment":"production","method":"POST","route":"ChatController.sendMessage","status":500,"duration_ms":4,"outcome":"error"}</text>
+<text x="34" y="246" fill="#e6edf3">{"timestamp":"2026-10-09T03:30:39.697Z","level":"info","event":"nest.log","environment":"production","context":"Demo","message":"Authorization: [redacted] [redacted]"}</text>
+<text x="34" y="300" fill="#8b949e">Evidence scope: isolated StructuredLogger runtime + TypeScript transpile, not Nest end-to-end execution.</text>
+</g>
+</svg>
