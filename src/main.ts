@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { WsAdapter } from '@nestjs/platform-ws';
 import { AppModule } from './app.module';
 import { RootConfig } from './config/env.validation';
+import { requestCorrelationMiddleware } from './observability/request-correlation';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -12,6 +13,7 @@ async function bootstrap() {
   const configService = app.get(ConfigService<RootConfig, true>);
   const port = configService.get('app', { infer: true }).port;
 
+  app.use(requestCorrelationMiddleware);
   app.enableCors();
   await app.listen(port);
 
