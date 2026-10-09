@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { NotificationPreferencesStore } from '../agent/memory/notification-preferences.store';
 import { AgentTool, ToolContext } from './tool.interface';
 import { ChiomaApiClient } from '../integrations/chioma-api/chioma-api.client';
 
@@ -125,14 +126,25 @@ export class SetNotificationPreferencesTool implements AgentTool {
     },
   };
 
-  constructor(private readonly chiomaApi: ChiomaApiClient) {}
+  constructor(
+    private readonly chiomaApi: ChiomaApiClient,
+    private readonly preferences: NotificationPreferencesStore = new NotificationPreferencesStore(),
+  ) {}
 
   async execute(args: Record<string, unknown>, context: ToolContext): Promise<string> {
-    const result = await this.chiomaApi.setNotificationPreferences(context.accessToken, {
+    const requested = {
       channels: (args.channels as string[]) ?? [],
       categories: (args.categories as Record<string, boolean>) ?? {},
       quietHours: (args.quietHours as Record<string, string>) ?? {},
-    });
+    };
+    const result = await this.chiomaApi.setNotificationPreferences(context.accessToken, requested);
+    if (result.saved) {
+      this.preferences.record(context.accessToken, {
+        channels: result.channels ?? requested.channels,
+        categories: result.categories ?? requested.categories,
+        quietHours: result.quietHours ?? requested.quietHours,
+      });
+    }
     return JSON.stringify(result);
   }
 }

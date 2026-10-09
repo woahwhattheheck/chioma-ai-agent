@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { NotificationPreferencesStore } from './notification-preferences.store';
 import { ConfigService } from '@nestjs/config';
 import { SESSION_STORE } from './session-store.interface';
 import { InMemorySessionStore } from './in-memory-session-store';
@@ -7,6 +8,7 @@ import { RootConfig } from '../../config/env.validation';
 
 @Module({
   providers: [
+    NotificationPreferencesStore,
     {
       provide: SESSION_STORE,
       useFactory: (configService: ConfigService<RootConfig, true>) => {
@@ -18,6 +20,6 @@ import { RootConfig } from '../../config/env.validation';
       inject: [ConfigService],
     },
   ],
-  exports: [SESSION_STORE],
+  exports: [SESSION_STORE, NotificationPreferencesStore],
 })
 export class MemoryModule {}

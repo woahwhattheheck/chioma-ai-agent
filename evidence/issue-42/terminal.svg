@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="540" viewBox="0 0 1500 540">
+<rect width="100%" height="100%" fill="#111827"/>
+<g fill="#e5e7eb" font-family="monospace" font-size="17">
+<text x="24" y="31">Actual captured Node execution — offline unit run, not a live backend</text>
+<text x="24" y="70">Chioma issue #42 | focused offline source execution</text>
+<text x="24" y="95">Runtime: v22.16.0; TypeScript: 5.8.3</text>
+<text x="24" y="120">service SHA256: f58cb86c15eb87e90f4d8c896207b54ab0178f130fada66ef87a431a2bd9d9c8</text>
+<text x="24" y="145">controller SHA256: a3beb5374186ffa77e741520718dddcd89074f9c26cd29d332d2985be9f87795</text>
+<text x="24" y="170">preferences SHA256: 30c38d7c9de0bfd669665670cba9cf6e44eaf7fda85714580daefb90bcdb652e</text>
+<text x="24" y="195">tool SHA256: 76e7635057b4e00d38bec968e03f7778ef9827ace1706d26fe312bbd7804d34b</text>
+<text x="24" y="220">Mocks: API, session store, Nest decorators, test clock and timer. No live network.</text>
+<text x="24" y="245">PASS default opt-out makes no API calls; invalid preferences rejected</text>
+<text x="24" y="270">PASS six-hour scheduler delivers rent, draft and dispute notices; lifecycle clears it</text>
+<text x="24" y="295">PASS same client session ID stays owner-scoped; opt-out affects only its owner</text>
+<text x="24" y="320">PASS opt-out during pending fetch suppresses delivery; overlapping poll is skipped</text>
+<text x="24" y="345">PASS expired opt-in and out-of-window notices do not deliver</text>
+<text x="24" y="370">PASS failed append retries once successfully, then deduplicates</text>
+<text x="24" y="395">PASS session reset cancels pending notification before awaiting store deletion</text>
+<text x="24" y="420">PASS existing preference tool filters categories and cancels a pending fetch on opt-out</text>
+<text x="24" y="445">PASS failed preference save cannot enable nudges; saved overnight quiet hours are respected</text>
+<text x="24" y="470">Result: 9/9 passed; 0 failed</text>
+<text x="24" y="495">Not a full Nest build, HTTP integration run, or sponsor acceptance decision.</text>
+</g></svg>

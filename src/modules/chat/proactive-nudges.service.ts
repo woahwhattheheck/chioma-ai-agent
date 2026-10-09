@@ -1,6 +1,7 @@
 import { BadRequestException, Inject, Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ChiomaApiClient, NotificationInfo } from '../../integrations/chioma-api/chioma-api.client';
 import { SESSION_STORE, SessionStore } from '../../agent/memory/session-store.interface';
+import { NotificationPreferencesStore } from '../../agent/memory/notification-preferences.store';
 
 interface ActiveSubscription {
   accessToken: string;
@@ -32,6 +33,7 @@ export class ProactiveNudgesService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly chiomaApi: ChiomaApiClient,
     @Inject(SESSION_STORE) private readonly sessionStore: SessionStore,
+    private readonly preferences: NotificationPreferencesStore = new NotificationPreferencesStore(),
   ) {}
 
   onModuleInit(): void {
@@ -110,7 +112,9 @@ export class ProactiveNudgesService implements OnModuleInit, OnModuleDestroy {
             continue;
           }
           const message = this.reminder(notification, now);
-          if (!message) continue;
+          if (!message || !this.preferences.allows(
+            subscription.accessToken, notification.type, Date.now(),
+          )) continue;
           if (this.subscribers.get(sessionId) !== subscription ||
               subscription.expiresAt <= Date.now()) break;
           try {

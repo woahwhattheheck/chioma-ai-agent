@@ -58,8 +58,9 @@ export class ChatController {
   ): Promise<void> {
     const accessToken = this.extractBearerToken(authorization);
     const sessionId = this.ownerScopedId(accessToken, clientSessionId);
-    await this.conversationService.resetSession(sessionId);
+    // Cancel pending notification fetches before yielding to session deletion.
     this.proactiveNudges.forget(sessionId);
+    await this.conversationService.resetSession(sessionId);
   }
 
   /**

@@ -1,0 +1,18 @@
+Chioma issue #42 | focused offline source execution
+Runtime: v22.16.0; TypeScript: 5.8.3
+service SHA256: f58cb86c15eb87e90f4d8c896207b54ab0178f130fada66ef87a431a2bd9d9c8
+controller SHA256: a3beb5374186ffa77e741520718dddcd89074f9c26cd29d332d2985be9f87795
+preferences SHA256: 30c38d7c9de0bfd669665670cba9cf6e44eaf7fda85714580daefb90bcdb652e
+tool SHA256: 76e7635057b4e00d38bec968e03f7778ef9827ace1706d26fe312bbd7804d34b
+Mocks: API, session store, Nest decorators, test clock and timer. No live network.
+PASS default opt-out makes no API calls; invalid preferences rejected
+PASS six-hour scheduler delivers rent, draft and dispute notices; lifecycle clears it
+PASS same client session ID stays owner-scoped; opt-out affects only its owner
+PASS opt-out during pending fetch suppresses delivery; overlapping poll is skipped
+PASS expired opt-in and out-of-window notices do not deliver
+PASS failed append retries once successfully, then deduplicates
+PASS session reset cancels pending notification before awaiting store deletion
+PASS existing preference tool filters categories and cancels a pending fetch on opt-out
+PASS failed preference save cannot enable nudges; saved overnight quiet hours are respected
+Result: 9/9 passed; 0 failed
+Not a full Nest build, HTTP integration run, or sponsor acceptance decision.

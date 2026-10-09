@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { MemoryModule } from '../agent/memory/memory.module';
 import { ChiomaApiModule } from '../integrations/chioma-api/chioma-api.module';
 import {
   GetMatchScoreTool,
@@ -67,7 +68,7 @@ const TOOL_PROVIDERS = [
 ];
 
 @Module({
-  imports: [ChiomaApiModule],
+  imports: [ChiomaApiModule, MemoryModule],
   providers: [
     ...TOOL_PROVIDERS,
     {
