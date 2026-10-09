@@ -48,4 +48,52 @@ describe('ToolRegistry', () => {
     expect(result).toMatch(/error executing tool "tool_a"/i);
     expect(result).toMatch(/boom/);
   });
+
+  it('logs structured failures with the session and redacted arguments without changing the reply', async () => {
+    const { Logger } = await import('@nestjs/common');
+    const log = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    try {
+      const execute = jest.fn().mockRejectedValue(new Error('backend unavailable'));
+      const registry = new ToolRegistry([makeTool('get_listing', execute)]);
+      const result = await registry.execute(
+        'get_listing',
+        {
+          listingId: 'listing-42',
+          accessToken: 'do-not-log',
+          nested: { apiKey: 'nested-secret', filter: 'available' },
+        },
+        { accessToken: 'caller-secret', sessionId: 'owner-hash:session-123' },
+      );
+      expect(result).toBe('Error executing tool "get_listing": backend unavailable');
+      expect(log).toHaveBeenCalledTimes(1);
+      const record = log.mock.calls[0][0] as Record<string, unknown>;
+      expect(record).toMatchObject({
+        event: 'agent_tool_execution_error',
+        toolName: 'get_listing',
+        sessionId: 'owner-hash:session-123',
+        error: 'backend unavailable',
+        args: {
+          listingId: 'listing-42',
+          accessToken: '[REDACTED]',
+          nested: { apiKey: '[REDACTED]', filter: 'available' },
+        },
+      });
+      expect(JSON.stringify(record)).not.toContain('caller-secret');
+      expect(JSON.stringify(record)).not.toContain('nested-secret');
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it('still returns unknown-tool errors without logging a crash', async () => {
+    const { Logger } = await import('@nestjs/common');
+    const log = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    try {
+      expect(await new ToolRegistry([]).execute('missing', {}, context))
+        .toBe('Error: unknown tool "missing"');
+      expect(log).not.toHaveBeenCalled();
+    } finally {
+      log.mockRestore();
+    }
+  });
 });
