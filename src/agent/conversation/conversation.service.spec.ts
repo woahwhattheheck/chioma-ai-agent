@@ -1,4 +1,5 @@
 import { ConversationService } from './conversation.service';
+import { Logger } from '@nestjs/common';
 import { LlmProvider } from '../llm/llm-provider.interface';
 import { LlmCompletionRequest, LlmCompletionResult } from '../llm/llm.types';
 import { SessionStore } from '../memory/session-store.interface';
@@ -98,6 +99,83 @@ describe('ConversationService', () => {
       { accessToken: 'tok' },
     );
     expect(complete).toHaveBeenCalledTimes(2);
+  });
+
+
+  it('records bounded, redacted invocation arguments and preserves tool output', async () => {
+    const log = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    try {
+      const { llmProvider, complete } = makeLlmProvider();
+      complete
+        .mockResolvedValueOnce({
+          message: {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              { id: 'call-1', name: 'get_thing', arguments: { id: '42', accessToken: 'secret', prompt: 'private request' } },
+            ],
+          },
+          stopReason: 'tool_calls',
+        })
+        .mockResolvedValueOnce({
+          message: { role: 'assistant', content: 'Finished' },
+          stopReason: 'stop',
+        });
+      const { toolRegistry, execute } = makeToolRegistry('tool output');
+      const service = new ConversationService(llmProvider, sessionStore, toolRegistry);
+
+      expect(await service.handleTurn('s1', 'test', { accessToken: 'secret' })).toBe('Finished');
+      expect(execute).toHaveBeenCalledWith('get_thing', {
+        id: '42', accessToken: 'secret', prompt: 'private request',
+      }, { accessToken: 'secret' });
+
+      const entry = JSON.parse(String(log.mock.calls.at(-1)?.[0])) as {
+        event: string; tool: string; args: Record<string, string>;
+        durationMs: number; success: boolean;
+      };
+      expect(entry).toMatchObject({
+        event: 'tool_invocation',
+        tool: 'get_thing',
+        args: { id: '42', accessToken: '[REDACTED]', prompt: '[REDACTED]' },
+        success: true,
+      });
+      expect(entry.durationMs).toBeGreaterThanOrEqual(0);
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it('reports registry error results as failed invocations without changing the result', async () => {
+    const log = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    try {
+      const { llmProvider, complete } = makeLlmProvider();
+      complete
+        .mockResolvedValueOnce({
+          message: {
+            role: 'assistant',
+            content: '',
+            toolCalls: [{ id: 'call-1', name: 'bad_tool', arguments: {} }],
+          },
+          stopReason: 'tool_calls',
+        })
+        .mockResolvedValueOnce({
+          message: { role: 'assistant', content: 'Handled' },
+          stopReason: 'stop',
+        });
+      const { toolRegistry, execute } = makeToolRegistry('Error executing tool "bad_tool": unavailable');
+      const service = new ConversationService(llmProvider, sessionStore, toolRegistry);
+
+      expect(await service.handleTurn('s2', 'test', { accessToken: 'secret' })).toBe('Handled');
+      expect(execute).toHaveBeenCalledTimes(1);
+      const entry = JSON.parse(String(log.mock.calls.at(-1)?.[0])) as {
+        event: string; tool: string; success: boolean;
+      };
+      expect(entry).toMatchObject({
+        event: 'tool_invocation', tool: 'bad_tool', success: false,
+      });
+    } finally {
+      log.mockRestore();
+    }
   });
 
   it('gives up after the max number of tool iterations', async () => {
