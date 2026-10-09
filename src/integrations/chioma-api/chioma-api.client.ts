@@ -241,6 +241,14 @@ export class ChiomaApiClient {
   }
 
   // ============ Escrow ============
+  // Read the indexed agreement NFT record, not a live contract state query.
+  getRentObligationNft(accessToken: string, agreementId: string): Promise<unknown> {
+    return this.get<unknown>(
+      `/api/v1/agreements/nfts/agreement/${encodeURIComponent(agreementId)}`,
+      accessToken,
+    );
+  }
+
   getEscrowStatus(accessToken: string, propertyId: string): Promise<EscrowStatus> {
     return this.get(`/api/escrow/status/${propertyId}`, accessToken);
   }
