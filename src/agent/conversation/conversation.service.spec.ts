@@ -129,7 +129,7 @@ describe('ConversationService', () => {
         id: '42', accessToken: 'secret', prompt: 'private request',
       }, { accessToken: 'secret' });
 
-      const entry = JSON.parse(String(log.mock.calls.at(-1)?.[0])) as {
+      const entry = JSON.parse(String(log.mock.calls[log.mock.calls.length - 1]?.[0])) as {
         event: string; tool: string; args: Record<string, string>;
         durationMs: number; success: boolean;
       };
@@ -167,7 +167,7 @@ describe('ConversationService', () => {
 
       expect(await service.handleTurn('s2', 'test', { accessToken: 'secret' })).toBe('Handled');
       expect(execute).toHaveBeenCalledTimes(1);
-      const entry = JSON.parse(String(log.mock.calls.at(-1)?.[0])) as {
+      const entry = JSON.parse(String(log.mock.calls[log.mock.calls.length - 1]?.[0])) as {
         event: string; tool: string; success: boolean;
       };
       expect(entry).toMatchObject({
