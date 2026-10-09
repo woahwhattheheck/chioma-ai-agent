@@ -10,14 +10,34 @@ import {
   Post,
   UnauthorizedException,
 } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiCreatedResponse,
+  ApiNoContentResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import { ConversationService } from '../../agent/conversation/conversation.service';
 import { ChatMessageDto } from './dto/chat-message.dto';
+import { ChatReplyDto } from './dto/chat-reply.dto';
 
+@ApiTags('chat')
+@ApiBearerAuth('chioma-access-token')
 @Controller('chat')
 export class ChatController {
   constructor(private readonly conversationService: ConversationService) {}
 
   @Post()
+  @ApiOperation({ summary: 'Send a message to the Chioma assistant' })
+  @ApiBody({ type: ChatMessageDto })
+  @ApiCreatedResponse({
+    description: 'Assistant reply with the public session ID.',
+    type: ChatReplyDto,
+  })
+  @ApiUnauthorizedResponse({ description: 'A bearer access token is required.' })
   async sendMessage(
     @Body() dto: ChatMessageDto,
     @Headers('authorization') authorization?: string,
@@ -35,6 +55,10 @@ export class ChatController {
 
   @Delete(':sessionId')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Clear the caller-owned chat session' })
+  @ApiParam({ name: 'sessionId', description: 'Public session ID from a chat reply.' })
+  @ApiNoContentResponse({ description: 'Session history was cleared.' })
+  @ApiUnauthorizedResponse({ description: 'A bearer access token is required.' })
   async resetSession(
     @Param('sessionId') clientSessionId: string,
     @Headers('authorization') authorization?: string,

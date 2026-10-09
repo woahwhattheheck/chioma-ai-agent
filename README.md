@@ -166,6 +166,12 @@ cp .env.example .env   # set LLM_PROVIDER, LLM_MODEL, and the matching API key
 pnpm run start:dev
 ```
 
+## HTTP API documentation
+
+Start the service with `pnpm run start:dev`, then open [Swagger UI](http://localhost:3100/api) at `http://localhost:<PORT>/api` (the default `PORT` is `3100`). The machine-readable OpenAPI JSON is at `/api-json`. The specification documents the real `POST /chat` and `DELETE /chat/:sessionId` routes, including request and response schemas, session IDs, success codes and bearer-token authentication. Use **Authorize** with the same Chioma backend access token accepted by the chat controller; the API docs do not issue tokens or bypass authentication.
+
+For a focused regression of the documentation UI, request schemas, bearer metadata, chat response and existing CORS behavior, run `pnpm exec jest src/openapi.spec.ts --runInBand`.
+
 Run the full check pipeline with `make check` (lint + typecheck + test) before opening a PR.
 
 ## Contributing
