@@ -40,6 +40,47 @@ export class GetPaymentStatusTool implements AgentTool {
 }
 
 /**
+ * Explicit rent-payment lookup used by the conversational agent.
+ * This tool only reads the caller's own payment status; no payment is initiated.
+ * The existing get_payment_status entry remains available for older clients.
+ */
+@Injectable()
+export class GetRentPaymentStatusTool implements AgentTool {
+  definition = {
+    name: 'get_rent_payment_status',
+    description:
+      'Read rent payment status, current balance, next due date and recent payment history without initiating a payment.',
+    parameters: {
+      type: 'object',
+      properties: {
+        propertyId: {
+          type: 'string',
+          description: 'Optional rental property ID. If omitted, return the caller\'s payments.',
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum history records (default 20).',
+          default: 20,
+        },
+      },
+    },
+  };
+
+  constructor(private readonly chiomaApi: ChiomaApiClient) {}
+
+  async execute(args: Record<string, unknown>, context: ToolContext): Promise<string> {
+    const propertyId = args.propertyId as string | undefined;
+    const limit = (args.limit as number) ?? 20;
+    const status = await this.chiomaApi.getRentPaymentStatus(
+      context.accessToken,
+      propertyId,
+      limit,
+    );
+    return JSON.stringify(status);
+  }
+}
+
+/**
  * Make or record a rent payment, or update payment method on file.
  * Returns confirmation of the payment or method update.
  */
