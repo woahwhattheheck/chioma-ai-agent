@@ -5,6 +5,26 @@ import { firstValueFrom } from 'rxjs';
 import { AxiosRequestConfig } from 'axios';
 import { RootConfig } from '../../config/env.validation';
 
+/** Fields exposed by the existing public GET /api/properties/:id endpoint. */
+export interface PropertyDetail {
+  id: string;
+  title: string;
+  type: string;
+  price: number | string; // Backend decimals may be serialized as strings.
+  currency: string;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  area?: number | string | null;
+  isFurnished?: boolean;
+  hasParking?: boolean;
+  petsAllowed?: boolean;
+  verificationStatus?: string | null;
+}
+
 export interface PropertyRecommendation {
   propertyId: string;
   score: number;
@@ -171,6 +191,14 @@ export class ChiomaApiClient {
     limit = 10,
   ): Promise<PropertyRecommendation[]> {
     return this.get('/api/ai/matching/recommendations', accessToken, { limit });
+  }
+
+  /** Read a published listing through the existing Chioma backend controller. */
+  getProperty(
+    accessToken: string,
+    propertyId: string,
+  ): Promise<PropertyDetail> {
+    return this.get(`/api/properties/${encodeURIComponent(propertyId)}`, accessToken);
   }
 
   getMatchScore(accessToken: string, propertyId: string): Promise<MatchScore> {
