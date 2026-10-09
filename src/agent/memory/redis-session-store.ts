@@ -4,6 +4,21 @@ import { SessionStore } from './session-store.interface';
 import { LlmMessage } from '../llm/llm.types';
 import { AppConfig } from '../../config/env.validation';
 
+// Redis runs each Lua script atomically. Keep the existing JSON-array storage format
+// so histories written before this change remain readable without a migration.
+const ATOMIC_APPEND_SCRIPT = [
+  "local stored = redis.call('GET', KEYS[1])",
+  "local history = stored and cjson.decode(stored) or {}",
+  "local incoming = cjson.decode(ARGV[1])",
+  "for i = 1, #incoming do",
+  "  history[#history + 1] = incoming[i]",
+  "end",
+  "local encoded = #history > 0 and cjson.encode(history) or '[]'",
+  "redis.call('SET', KEYS[1], encoded, 'EX', tonumber(ARGV[2]))",
+  "return #history",
+].join('\n');
+
+
 @Injectable()
 export class RedisSessionStore implements SessionStore, OnModuleDestroy {
   private readonly redis: Redis;
@@ -20,9 +35,15 @@ export class RedisSessionStore implements SessionStore, OnModuleDestroy {
   }
 
   async appendMessages(sessionId: string, messages: LlmMessage[]): Promise<void> {
-    const history = await this.getHistory(sessionId);
-    history.push(...messages);
-    await this.redis.set(this.key(sessionId), JSON.stringify(history), 'EX', this.ttlSeconds);
+    // A GET then SET would lose one turn if two callers read the same history.
+    // EVAL does the read, append and TTL refresh as one Redis operation.
+    await this.redis.eval(
+      ATOMIC_APPEND_SCRIPT,
+      1,
+      this.key(sessionId),
+      JSON.stringify(messages),
+      String(this.ttlSeconds),
+    );
   }
 
   async clear(sessionId: string): Promise<void> {
