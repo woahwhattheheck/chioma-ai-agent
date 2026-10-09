@@ -10,7 +10,7 @@ import {
   GetDescriptionSuggestionTool,
   GetPricingSuggestionTool,
 } from './wizard.tool';
-import { GetPaymentStatusTool, MakePaymentTool, GetChargeBreakdownTool } from './payments.tool';
+import { GetPaymentStatusTool, GetRentPaymentStatusTool, MakePaymentTool, GetChargeBreakdownTool } from './payments.tool';
 import {
   GetEscrowStatusTool,
   RequestEscrowReleaseTool,
@@ -45,6 +45,7 @@ const TOOL_PROVIDERS = [
   GetCompletenessScoreTool,
   // Payments
   GetPaymentStatusTool,
+  GetRentPaymentStatusTool,
   MakePaymentTool,
   GetChargeBreakdownTool,
   // Escrow
