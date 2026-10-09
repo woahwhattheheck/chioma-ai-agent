@@ -111,6 +111,8 @@ export class ProactiveNudgesService implements OnModuleInit, OnModuleDestroy {
           }
           const message = this.reminder(notification, now);
           if (!message) continue;
+          if (this.subscribers.get(sessionId) !== subscription ||
+              subscription.expiresAt <= Date.now()) break;
           try {
             await this.sessionStore.appendMessages(sessionId, [
               { role: 'assistant', content: message },
